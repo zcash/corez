@@ -30,3 +30,9 @@ pub use error::{Error, ErrorKind};
 #[cfg(not(feature = "std"))]
 /// A specialized [`Result`](core::result::Result) type for I/O operations.
 pub type Result<T> = core::result::Result<T, Error>;
+
+#[cfg(not(feature = "std"))]
+mod traits;
+
+#[cfg(not(feature = "std"))]
+pub use traits::{Read, Write};
