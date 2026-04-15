@@ -17,7 +17,12 @@ pub trait Read {
             match self.read(buf) {
                 Ok(0) => return Err(Error::from(ErrorKind::UnexpectedEof)),
                 Ok(n) => buf = &mut buf[n..],
-                Err(ref e) if e.kind() == ErrorKind::Interrupted => {}
+                Err(ref e) if e.kind() == ErrorKind::Interrupted => {
+                    // Errors of kind [`ErrorKind::Interrupted`] are automatically retried.
+                    // This matches the behavior of [`std::io::Read::read_exact`]: since this
+                    // method promises to fill `buf` completely, a transient interruption
+                    // (e.g. EINTR) is not a reason to fail — the read is simply retried.
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -42,7 +47,12 @@ pub trait Write {
             match self.write(buf) {
                 Ok(0) => return Err(Error::from(ErrorKind::WriteZero)),
                 Ok(n) => buf = &buf[n..],
-                Err(ref e) if e.kind() == ErrorKind::Interrupted => {}
+                Err(ref e) if e.kind() == ErrorKind::Interrupted => {
+                    // Errors of kind [`ErrorKind::Interrupted`] are automatically retried.
+                    // This matches the behavior of [`std::io::Write::write_all`]: since this
+                    // method promises to write `buf` completely, a transient interruption
+                    // (e.g. EINTR) is not a reason to fail — the write is simply retried.
+                }
                 Err(e) => return Err(e),
             }
         }

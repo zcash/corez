@@ -108,7 +108,9 @@ impl Write for Cursor<&mut [u8]> {
 #[cfg(feature = "alloc")]
 fn vec_write(pos: &mut u64, vec: &mut alloc::vec::Vec<u8>, buf: &[u8]) -> Result<usize> {
     let start = *pos as usize;
-    // If position is past the end, fill gap with zeros.
+    // If position is past the end, fill gap with zeros up to the write
+    // position. The written data itself is then handled below via
+    // copy_from_slice (overwrite) and extend_from_slice (append).
     if start > vec.len() {
         vec.resize(start, 0);
     }
