@@ -39,3 +39,9 @@ pub use traits::{Read, Write};
 
 #[cfg(not(feature = "std"))]
 mod impls;
+
+#[cfg(not(feature = "std"))]
+mod cursor;
+
+#[cfg(not(feature = "std"))]
+pub use cursor::Cursor;
