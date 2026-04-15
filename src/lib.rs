@@ -36,3 +36,6 @@ mod traits;
 
 #[cfg(not(feature = "std"))]
 pub use traits::{Read, Write};
+
+#[cfg(not(feature = "std"))]
+mod impls;
