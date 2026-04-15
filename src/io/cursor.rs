@@ -4,8 +4,7 @@
 
 use core::cmp;
 
-use crate::{Error, ErrorKind};
-use crate::{Read, Result, Write};
+use super::{Error, ErrorKind, Read, Result, Write};
 
 /// A `Cursor` wraps an in-memory buffer and provides it with a [`Read`]
 /// and/or [`Write`] implementation.
@@ -161,7 +160,7 @@ mod tests {
     use alloc::vec::Vec;
 
     use super::Cursor;
-    use crate::{Read, Write};
+    use crate::io::{Read, Write};
 
     #[test]
     fn cursor_read_basic() {
@@ -179,7 +178,7 @@ mod tests {
         let mut cursor = Cursor::new(&data[..]);
         let mut buf = [0u8; 3];
         let err = cursor.read_exact(&mut buf).unwrap_err();
-        assert_eq!(err.kind(), crate::ErrorKind::UnexpectedEof);
+        assert_eq!(err.kind(), crate::io::ErrorKind::UnexpectedEof);
     }
 
     #[test]

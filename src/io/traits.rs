@@ -1,6 +1,6 @@
 //! `Read` and `Write` trait definitions for `no_std` environments.
 
-use crate::{Error, ErrorKind, Result};
+use super::{Error, ErrorKind, Result};
 use core::fmt;
 
 /// A trait for reading bytes from a source.

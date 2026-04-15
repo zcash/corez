@@ -1,6 +1,6 @@
 //! `Read` and `Write` implementations for core types in `no_std` environments.
 
-use crate::{Error, ErrorKind, Read, Result, Write};
+use super::{Error, ErrorKind, Read, Result, Write};
 
 // ---------------------------------------------------------------------------
 // Forwarding impls — &mut R / &mut W
@@ -156,7 +156,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use crate::{Read, Write};
+    use crate::io::{Read, Write};
 
     #[test]
     fn read_slice_basic() {
@@ -184,7 +184,7 @@ mod tests {
         let mut reader: &[u8] = &data;
         let mut buf = [0u8; 3];
         let err = reader.read_exact(&mut buf).unwrap_err();
-        assert_eq!(err.kind(), crate::ErrorKind::UnexpectedEof);
+        assert_eq!(err.kind(), crate::io::ErrorKind::UnexpectedEof);
     }
 
     #[test]
