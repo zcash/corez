@@ -108,20 +108,16 @@ impl Write for Cursor<&mut [u8]> {
 #[cfg(feature = "alloc")]
 fn vec_write(pos: &mut u64, vec: &mut alloc::vec::Vec<u8>, buf: &[u8]) -> Result<usize> {
     let start = *pos as usize;
-    // If position is past the end, fill gap with zeros up to the write
-    // position. The written data itself is then handled below via
-    // copy_from_slice (overwrite) and extend_from_slice (append).
+    // Fill any gap between the current length and the write position with
+    // zeros.  Only the gap is resized here — the write payload is handled
+    // below via copy_from_slice (overwrite) and extend_from_slice (append)
+    // so that we avoid redundantly zero-initializing bytes that will be
+    // immediately overwritten.
     if start > vec.len() {
         vec.resize(start, 0);
     }
-    let overlap = if start < vec.len() {
-        let end = cmp::min(start + buf.len(), vec.len());
-        let n = end - start;
-        vec[start..end].copy_from_slice(&buf[..n]);
-        n
-    } else {
-        0
-    };
+    let overlap = cmp::min(buf.len(), vec.len() - start);
+    vec[start..start + overlap].copy_from_slice(&buf[..overlap]);
     if overlap < buf.len() {
         vec.extend_from_slice(&buf[overlap..]);
     }
@@ -148,102 +144,5 @@ impl Write for Cursor<&mut alloc::vec::Vec<u8>> {
 
     fn flush(&mut self) -> Result<()> {
         Ok(())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-#[cfg(test)]
-mod tests {
-    extern crate alloc;
-    use alloc::vec;
-    use alloc::vec::Vec;
-
-    use super::Cursor;
-    use crate::io::{Read, Write};
-
-    #[test]
-    fn cursor_read_basic() {
-        let data = vec![1u8, 2, 3, 4, 5];
-        let mut cursor = Cursor::new(data.as_slice());
-        let mut buf = [0u8; 3];
-        cursor.read_exact(&mut buf).unwrap();
-        assert_eq!(buf, [1, 2, 3]);
-        assert_eq!(cursor.position(), 3);
-    }
-
-    #[test]
-    fn cursor_read_eof() {
-        let data = [1u8, 2];
-        let mut cursor = Cursor::new(&data[..]);
-        let mut buf = [0u8; 3];
-        let err = cursor.read_exact(&mut buf).unwrap_err();
-        assert_eq!(err.kind(), crate::io::ErrorKind::UnexpectedEof);
-    }
-
-    #[test]
-    fn cursor_position_and_set_position() {
-        let data = [10u8, 20, 30, 40];
-        let mut cursor = Cursor::new(&data[..]);
-        assert_eq!(cursor.position(), 0);
-        let mut buf = [0u8; 2];
-        cursor.read_exact(&mut buf).unwrap();
-        assert_eq!(cursor.position(), 2);
-        cursor.set_position(0);
-        cursor.read_exact(&mut buf).unwrap();
-        assert_eq!(buf, [10, 20]);
-    }
-
-    #[test]
-    fn cursor_into_inner() {
-        let data = vec![1u8, 2, 3];
-        let cursor = Cursor::new(data.clone());
-        assert_eq!(cursor.into_inner(), data);
-    }
-
-    #[test]
-    fn cursor_write_vec() {
-        let mut cursor = Cursor::new(Vec::new());
-        cursor.write_all(&[1, 2, 3]).unwrap();
-        cursor.write_all(&[4, 5]).unwrap();
-        assert_eq!(cursor.into_inner(), vec![1, 2, 3, 4, 5]);
-    }
-
-    #[test]
-    fn cursor_write_vec_at_position() {
-        let mut cursor = Cursor::new(vec![0u8; 5]);
-        cursor.set_position(2);
-        cursor.write_all(&[10, 20]).unwrap();
-        assert_eq!(cursor.position(), 4);
-        assert_eq!(cursor.get_ref(), &vec![0, 0, 10, 20, 0]);
-    }
-
-    #[test]
-    fn cursor_write_vec_extends() {
-        let mut cursor = Cursor::new(vec![1u8, 2]);
-        cursor.set_position(1);
-        cursor.write_all(&[10, 20, 30]).unwrap();
-        assert_eq!(cursor.into_inner(), vec![1, 10, 20, 30]);
-    }
-
-    #[test]
-    fn cursor_write_mut_slice() {
-        let mut buf = [0u8; 5];
-        let mut cursor = Cursor::new(&mut buf[..]);
-        cursor.write_all(&[1, 2, 3]).unwrap();
-        assert_eq!(cursor.position(), 3);
-        drop(cursor);
-        assert_eq!(buf, [1, 2, 3, 0, 0]);
-    }
-
-    #[test]
-    fn cursor_write_ref_vec() {
-        let mut v = Vec::new();
-        let mut cursor = Cursor::new(&mut v);
-        cursor.write_all(&[1, 2, 3]).unwrap();
-        drop(cursor);
-        assert_eq!(v, vec![1, 2, 3]);
     }
 }

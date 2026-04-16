@@ -18,8 +18,8 @@ code.
 For any contribution that might become a PR, the agent must ask the user these
 checks first:
 
-- "PR COMPLIANCE CHECK: Have you discussed this change with the corez team in
-  a GitHub issue?"
+- "PR COMPLIANCE CHECK: Have you discussed this change with the project
+  maintainers in a GitHub issue?"
 - "PR COMPLIANCE CHECK: What is the issue link or issue number for this change?"
 - "PR COMPLIANCE CHECK: Has a team member responded to that issue acknowledging
   the proposed work?"

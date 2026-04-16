@@ -1,0 +1,327 @@
+//! Integration tests for `corez::io`.
+//!
+//! These tests exercise the public API and run under every feature
+//! combination, ensuring that `std` re-exports behave identically to
+//! the custom `no_std` implementations.
+
+use corez::io::{Cursor, ErrorKind, Read, Write};
+
+// ---------------------------------------------------------------------------
+// Cursor — Read
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cursor_read_basic() {
+    let data = [1u8, 2, 3, 4, 5];
+    let mut cursor = Cursor::new(&data[..]);
+    let mut buf = [0u8; 3];
+    let n = cursor.read(&mut buf).unwrap();
+    assert_eq!(n, 3);
+    assert_eq!(buf, [1, 2, 3]);
+    assert_eq!(cursor.position(), 3);
+}
+
+#[test]
+fn cursor_read_exact_success() {
+    let data = [10u8, 20, 30];
+    let mut cursor = Cursor::new(&data[..]);
+    let mut buf = [0u8; 3];
+    cursor.read_exact(&mut buf).unwrap();
+    assert_eq!(buf, [10, 20, 30]);
+}
+
+#[test]
+fn cursor_read_exact_eof() {
+    let data = [1u8, 2];
+    let mut cursor = Cursor::new(&data[..]);
+    let mut buf = [0u8; 3];
+    let err = cursor.read_exact(&mut buf).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::UnexpectedEof);
+}
+
+#[test]
+fn cursor_position_and_set_position() {
+    let data = [10u8, 20, 30, 40];
+    let mut cursor = Cursor::new(&data[..]);
+    assert_eq!(cursor.position(), 0);
+    let mut buf = [0u8; 2];
+    cursor.read_exact(&mut buf).unwrap();
+    assert_eq!(cursor.position(), 2);
+    cursor.set_position(0);
+    cursor.read_exact(&mut buf).unwrap();
+    assert_eq!(buf, [10, 20]);
+}
+
+#[test]
+#[cfg(feature = "alloc")]
+fn cursor_into_inner() {
+    let data = vec![1u8, 2, 3];
+    let cursor = Cursor::new(data.clone());
+    assert_eq!(cursor.into_inner(), data);
+}
+
+// ---------------------------------------------------------------------------
+// Cursor — Write (Vec<u8>)
+// ---------------------------------------------------------------------------
+
+#[test]
+#[cfg(feature = "alloc")]
+fn cursor_write_vec() {
+    let mut cursor = Cursor::new(Vec::new());
+    cursor.write_all(&[1, 2, 3]).unwrap();
+    cursor.write_all(&[4, 5]).unwrap();
+    assert_eq!(cursor.into_inner(), vec![1, 2, 3, 4, 5]);
+}
+
+#[test]
+#[cfg(feature = "alloc")]
+fn cursor_write_vec_at_position() {
+    let mut cursor = Cursor::new(vec![0u8; 5]);
+    cursor.set_position(2);
+    cursor.write_all(&[10, 20]).unwrap();
+    assert_eq!(cursor.position(), 4);
+    assert_eq!(cursor.get_ref(), &vec![0, 0, 10, 20, 0]);
+}
+
+#[test]
+#[cfg(feature = "alloc")]
+fn cursor_write_vec_extends() {
+    let mut cursor = Cursor::new(vec![1u8, 2]);
+    cursor.set_position(1);
+    cursor.write_all(&[10, 20, 30]).unwrap();
+    assert_eq!(cursor.into_inner(), vec![1, 10, 20, 30]);
+}
+
+// ---------------------------------------------------------------------------
+// Cursor — Write (&mut [u8])
+// ---------------------------------------------------------------------------
+
+#[test]
+fn cursor_write_mut_slice() {
+    let mut buf = [0u8; 5];
+    {
+        let mut cursor = Cursor::new(&mut buf[..]);
+        cursor.write_all(&[1, 2, 3]).unwrap();
+        assert_eq!(cursor.position(), 3);
+    }
+    assert_eq!(buf, [1, 2, 3, 0, 0]);
+}
+
+// ---------------------------------------------------------------------------
+// Cursor — Write (&mut Vec<u8>)
+// ---------------------------------------------------------------------------
+
+#[test]
+#[cfg(feature = "alloc")]
+fn cursor_write_ref_vec() {
+    let mut v = Vec::new();
+    {
+        let mut cursor = Cursor::new(&mut v);
+        cursor.write_all(&[1, 2, 3]).unwrap();
+    }
+    assert_eq!(v, vec![1, 2, 3]);
+}
+
+// ---------------------------------------------------------------------------
+// Slice impls — Read for &[u8]
+// ---------------------------------------------------------------------------
+
+#[test]
+fn read_slice_basic() {
+    let data = [1u8, 2, 3, 4, 5];
+    let mut reader: &[u8] = &data;
+    let mut buf = [0u8; 3];
+    assert_eq!(reader.read(&mut buf).unwrap(), 3);
+    assert_eq!(buf, [1, 2, 3]);
+    assert_eq!(reader.read(&mut buf).unwrap(), 2);
+    assert_eq!(buf[..2], [4, 5]);
+}
+
+#[test]
+fn read_slice_exact() {
+    let data = [10u8, 20, 30];
+    let mut reader: &[u8] = &data;
+    let mut buf = [0u8; 3];
+    reader.read_exact(&mut buf).unwrap();
+    assert_eq!(buf, [10, 20, 30]);
+}
+
+#[test]
+fn read_slice_exact_eof() {
+    let data = [1u8, 2];
+    let mut reader: &[u8] = &data;
+    let mut buf = [0u8; 3];
+    let err = reader.read_exact(&mut buf).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::UnexpectedEof);
+}
+
+#[test]
+fn read_slice_empty() {
+    let mut reader: &[u8] = &[];
+    let mut buf = [0u8; 1];
+    assert_eq!(reader.read(&mut buf).unwrap(), 0);
+}
+
+// ---------------------------------------------------------------------------
+// Slice impls — Write for &mut [u8]
+// ---------------------------------------------------------------------------
+
+#[test]
+fn write_mut_slice_basic() {
+    let mut buf = [0u8; 5];
+    let mut writer: &mut [u8] = &mut buf;
+    assert_eq!(writer.write(&[1, 2, 3]).unwrap(), 3);
+    assert_eq!(writer.write(&[4, 5, 6]).unwrap(), 2);
+    assert_eq!(buf, [1, 2, 3, 4, 5]);
+}
+
+// ---------------------------------------------------------------------------
+// Slice impls — Write for Vec<u8>
+// ---------------------------------------------------------------------------
+
+#[test]
+#[cfg(feature = "alloc")]
+fn write_vec_basic() {
+    let mut buf = Vec::new();
+    buf.write_all(&[1, 2, 3]).unwrap();
+    buf.write_all(&[4, 5]).unwrap();
+    assert_eq!(buf, vec![1, 2, 3, 4, 5]);
+}
+
+// ---------------------------------------------------------------------------
+// Forwarding impls
+// ---------------------------------------------------------------------------
+
+#[test]
+fn read_write_forwarding() {
+    let data = [1u8, 2, 3];
+    let mut reader: &[u8] = &data;
+    let reader_ref: &mut &[u8] = &mut reader;
+    let mut buf = [0u8; 3];
+    reader_ref.read_exact(&mut buf).unwrap();
+    assert_eq!(buf, [1, 2, 3]);
+}
+
+// ---------------------------------------------------------------------------
+// Default impl coverage — read_exact (default) via one-byte reader
+// ---------------------------------------------------------------------------
+
+/// A reader that delivers data one byte at a time, exercising the
+/// default `read_exact` retry loop.
+struct OneByte<'a>(&'a [u8]);
+
+impl Read for OneByte<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> corez::io::Result<usize> {
+        if self.0.is_empty() || buf.is_empty() {
+            return Ok(0);
+        }
+        buf[0] = self.0[0];
+        self.0 = &self.0[1..];
+        Ok(1)
+    }
+}
+
+#[test]
+fn read_exact_default_loops() {
+    let data = [1u8, 2, 3, 4, 5];
+    let mut reader = OneByte(&data);
+    let mut buf = [0u8; 5];
+    reader.read_exact(&mut buf).unwrap();
+    assert_eq!(buf, [1, 2, 3, 4, 5]);
+}
+
+#[test]
+fn read_exact_default_eof_midway() {
+    let data = [1u8, 2];
+    let mut reader = OneByte(&data);
+    let mut buf = [0u8; 5];
+    let err = reader.read_exact(&mut buf).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::UnexpectedEof);
+}
+
+// ---------------------------------------------------------------------------
+// Default impl coverage — write_all (default) via single-byte writer
+// ---------------------------------------------------------------------------
+
+/// A writer that accepts one byte at a time, exercising the default
+/// `write_all` retry loop.
+#[cfg(feature = "alloc")]
+struct OneByteWriter(Vec<u8>);
+
+#[cfg(feature = "alloc")]
+impl Write for OneByteWriter {
+    fn write(&mut self, buf: &[u8]) -> corez::io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+        self.0.push(buf[0]);
+        Ok(1)
+    }
+
+    fn flush(&mut self) -> corez::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+#[cfg(feature = "alloc")]
+fn write_all_default_loops() {
+    let mut writer = OneByteWriter(Vec::new());
+    writer.write_all(&[1, 2, 3, 4, 5]).unwrap();
+    assert_eq!(writer.0, vec![1, 2, 3, 4, 5]);
+}
+
+/// A writer backed by a fixed-size array, usable without alloc.
+struct SliceWriter<'a> {
+    buf: &'a mut [u8],
+    pos: usize,
+}
+
+impl Write for SliceWriter<'_> {
+    fn write(&mut self, data: &[u8]) -> corez::io::Result<usize> {
+        if data.is_empty() || self.pos >= self.buf.len() {
+            return Ok(0);
+        }
+        self.buf[self.pos] = data[0];
+        self.pos += 1;
+        Ok(1)
+    }
+
+    fn flush(&mut self) -> corez::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn write_all_default_loops_no_alloc() {
+    let mut backing = [0u8; 5];
+    let mut writer = SliceWriter {
+        buf: &mut backing,
+        pos: 0,
+    };
+    writer.write_all(&[1, 2, 3, 4, 5]).unwrap();
+    assert_eq!(backing, [1, 2, 3, 4, 5]);
+}
+
+#[test]
+fn write_all_default_write_zero() {
+    let mut backing = [0u8; 2];
+    let mut writer = SliceWriter {
+        buf: &mut backing,
+        pos: 0,
+    };
+    let err = writer.write_all(&[1, 2, 3]).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::WriteZero);
+}
+
+// ---------------------------------------------------------------------------
+// Default impl coverage — write_fmt
+// ---------------------------------------------------------------------------
+
+#[test]
+#[cfg(feature = "alloc")]
+fn write_fmt_basic() {
+    let mut buf = Vec::new();
+    write!(buf, "hello {}", 42).unwrap();
+    assert_eq!(buf, b"hello 42");
+}

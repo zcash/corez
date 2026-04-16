@@ -81,21 +81,25 @@ pub struct Error {
 }
 
 impl Error {
-    /// Creates a new I/O error from an [`ErrorKind`] and an error payload.
+    /// Creates a new I/O error from an [`ErrorKind`] and a static message.
     ///
-    /// Without the `alloc` feature, the payload is a `&'static str`.
-    /// With `alloc`, the payload may be any `E: Into<Box<dyn Error + Send + Sync>>`.
-    #[cfg(not(feature = "alloc"))]
-    pub fn new(kind: ErrorKind, message: &'static str) -> Self {
+    /// This constructor is available with or without `alloc`.
+    pub fn new_static(kind: ErrorKind, message: &'static str) -> Self {
         Error {
-            repr: Repr::Custom { kind, message },
+            repr: Repr::Custom {
+                kind,
+                #[cfg(not(feature = "alloc"))]
+                message,
+                #[cfg(feature = "alloc")]
+                error: message.into(),
+            },
         }
     }
 
-    /// Creates a new I/O error from an [`ErrorKind`] and an error payload.
+    /// Creates a new I/O error from an [`ErrorKind`] and an error source.
     ///
-    /// Without the `alloc` feature, the payload is a `&'static str`.
-    /// With `alloc`, the payload may be any `E: Into<Box<dyn Error + Send + Sync>>`.
+    /// The source may be any `E: Into<Box<dyn Error + Send + Sync>>`.
+    /// This matches the signature of [`std::io::Error::new`].
     #[cfg(feature = "alloc")]
     pub fn new<E>(kind: ErrorKind, error: E) -> Self
     where
@@ -201,6 +205,12 @@ mod tests {
     fn simple_error_preserves_kind() {
         let err = Error::from(ErrorKind::InvalidData);
         assert_eq!(err.kind(), ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn static_error_preserves_kind() {
+        let err = Error::new_static(ErrorKind::NotFound, "widget missing");
+        assert_eq!(err.kind(), ErrorKind::NotFound);
     }
 
     #[test]
