@@ -7,6 +7,11 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-17
+
+### Changed
+- `corez` now uses `edition = "2021"` instead of `edition = "2024"`.
+
 ## [0.1.0] - 2026-04-17
 
 Initial Release
