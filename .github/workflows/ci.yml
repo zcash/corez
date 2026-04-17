@@ -67,6 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: cargo clippy --all-features --all-targets -- -D warnings
+      - run: cargo clippy --no-default-features  --features alloc --all-targets -- -D warnings
       - run: cargo clippy --no-default-features --all-targets -- -D warnings
 
   fmt:
