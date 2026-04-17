@@ -40,6 +40,15 @@ fn cursor_read_exact_eof() {
 }
 
 #[test]
+fn cursor_read_past_end() {
+    let data = [1u8, 2, 3];
+    let mut cursor = Cursor::new(&data[..]);
+    cursor.set_position(100);
+    let mut buf = [0u8; 1];
+    assert_eq!(cursor.read(&mut buf).unwrap(), 0); // EOF
+}
+
+#[test]
 fn cursor_position_and_set_position() {
     let data = [10u8, 20, 30, 40];
     let mut cursor = Cursor::new(&data[..]);
@@ -104,6 +113,15 @@ fn cursor_write_vec_pos_overflow() {
     assert_eq!(err.kind(), ErrorKind::InvalidInput);
 }
 
+#[test]
+#[cfg(feature = "alloc")]
+fn cursor_write_vec_gap_fill() {
+    let mut cursor = Cursor::new(vec![1u8, 2]);
+    cursor.set_position(5);
+    cursor.write_all(&[10]).unwrap();
+    assert_eq!(cursor.into_inner(), vec![1, 2, 0, 0, 0, 10]);
+}
+
 // ---------------------------------------------------------------------------
 // Cursor — Write (&mut [u8])
 // ---------------------------------------------------------------------------
@@ -117,6 +135,22 @@ fn cursor_write_mut_slice() {
         assert_eq!(cursor.position(), 3);
     }
     assert_eq!(buf, [1, 2, 3, 0, 0]);
+}
+
+#[test]
+fn cursor_write_mut_slice_overflow() {
+    let mut buf = [0u8; 2];
+    let mut cursor = Cursor::new(&mut buf[..]);
+    let err = cursor.write_all(&[1, 2, 3]).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::WriteZero);
+}
+
+#[test]
+fn cursor_write_mut_slice_short() {
+    let mut buf = [0u8; 3];
+    let mut cursor = Cursor::new(&mut buf[..]);
+    cursor.set_position(2);
+    assert_eq!(cursor.write(&[1, 2, 3]).unwrap(), 1); // only 1 byte fits
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +248,27 @@ fn read_write_forwarding() {
     assert_eq!(buf, [1, 2, 3]);
 }
 
+#[test]
+#[cfg(feature = "alloc")]
+fn box_read_forwarding() {
+    let data: &[u8] = &[1, 2, 3];
+    let mut reader: Box<dyn Read> = Box::new(data);
+    let mut buf = [0u8; 3];
+    reader.read_exact(&mut buf).unwrap();
+    assert_eq!(buf, [1, 2, 3]);
+}
+
+#[test]
+#[cfg(feature = "alloc")]
+fn box_write_forwarding() {
+    let mut v = Vec::new();
+    {
+        let mut writer: Box<dyn Write> = Box::new(&mut v);
+        writer.write_all(&[1, 2, 3]).unwrap();
+    }
+    assert_eq!(v, vec![1, 2, 3]);
+}
+
 // ---------------------------------------------------------------------------
 // Default impl coverage — read_exact (default) via one-byte reader
 // ---------------------------------------------------------------------------
@@ -249,6 +304,44 @@ fn read_exact_default_eof_midway() {
     let mut buf = [0u8; 5];
     let err = reader.read_exact(&mut buf).unwrap_err();
     assert_eq!(err.kind(), ErrorKind::UnexpectedEof);
+}
+
+// ---------------------------------------------------------------------------
+// Default impl coverage — read_exact retries Interrupted
+// ---------------------------------------------------------------------------
+
+/// A reader that returns `Interrupted` once before delivering data one
+/// byte at a time, exercising the `read_exact` retry path.
+struct InterruptOnce<'a> {
+    inner: &'a [u8],
+    interrupted: bool,
+}
+
+impl Read for InterruptOnce<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> corez::io::Result<usize> {
+        if !self.interrupted {
+            self.interrupted = true;
+            return Err(corez::io::Error::from(ErrorKind::Interrupted));
+        }
+        if self.inner.is_empty() || buf.is_empty() {
+            return Ok(0);
+        }
+        buf[0] = self.inner[0];
+        self.inner = &self.inner[1..];
+        Ok(1)
+    }
+}
+
+#[test]
+fn read_exact_retries_interrupted() {
+    let data = [1u8, 2, 3];
+    let mut reader = InterruptOnce {
+        inner: &data,
+        interrupted: false,
+    };
+    let mut buf = [0u8; 3];
+    reader.read_exact(&mut buf).unwrap();
+    assert_eq!(buf, [1, 2, 3]);
 }
 
 // ---------------------------------------------------------------------------
@@ -336,4 +429,101 @@ fn write_fmt_basic() {
     let mut buf = Vec::new();
     write!(buf, "hello {}", 42).unwrap();
     assert_eq!(buf, b"hello 42");
+}
+
+#[test]
+fn write_fmt_propagates_io_error() {
+    struct FailWriter;
+    impl Write for FailWriter {
+        fn write(&mut self, _: &[u8]) -> corez::io::Result<usize> {
+            Err(corez::io::Error::from(ErrorKind::Other))
+        }
+        fn flush(&mut self) -> corez::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut w = FailWriter;
+    let err = write!(w, "hello").unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::Other);
+}
+
+// ---------------------------------------------------------------------------
+// Error — source()
+// ---------------------------------------------------------------------------
+
+#[test]
+fn simple_error_has_no_source() {
+    use core::error::Error as _;
+    let err = corez::io::Error::from(ErrorKind::Other);
+    assert!(err.source().is_none());
+}
+
+#[test]
+#[cfg(feature = "alloc")]
+fn custom_error_wrapping_simple_has_no_source() {
+    use core::error::Error as _;
+    // Wrapping a simple io::Error (which itself has no source) produces
+    // no source chain, because io::Error::source() delegates to the
+    // wrapped error's source(), matching std::io::Error behaviour.
+    let inner = corez::io::Error::from(ErrorKind::InvalidData);
+    let outer = corez::io::Error::new(ErrorKind::Other, inner);
+    assert!(outer.source().is_none());
+}
+
+/// An error type with a source, for testing source() delegation.
+#[cfg(feature = "alloc")]
+mod error_with_source {
+    use core::fmt;
+
+    #[derive(Debug)]
+    pub struct Root;
+
+    impl fmt::Display for Root {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("root cause")
+        }
+    }
+
+    impl core::error::Error for Root {}
+
+    #[derive(Debug)]
+    pub struct Wrapper(pub Root);
+
+    impl fmt::Display for Wrapper {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("wrapper")
+        }
+    }
+
+    impl core::error::Error for Wrapper {
+        fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+            Some(&self.0)
+        }
+    }
+}
+
+#[test]
+#[cfg(feature = "alloc")]
+fn custom_error_delegates_source() {
+    use core::error::Error as _;
+    use error_with_source::{Root, Wrapper};
+
+    let err = corez::io::Error::new(ErrorKind::Other, Wrapper(Root));
+    // source() should delegate to Wrapper::source(), returning the Root.
+    let src = err.source().expect("expected a source");
+    assert_eq!(src.to_string(), "root cause");
+}
+
+// ---------------------------------------------------------------------------
+// ErrorKind — Display without alloc
+// ---------------------------------------------------------------------------
+
+#[test]
+fn error_kind_display_no_alloc() {
+    let mut buf = [0u8; 64];
+    let mut cursor = Cursor::new(&mut buf[..]);
+    // write! dispatches to io::Write::write_fmt when io::Write is in scope.
+    write!(cursor, "{}", ErrorKind::NotFound).unwrap();
+    let written = cursor.position() as usize;
+    assert_eq!(&buf[..written], b"entity not found");
 }
