@@ -1,7 +1,7 @@
 [package]
 name = "corez"
 description = "Safe, no_std-compatible Read/Write traits for the Zcash ecosystem."
-version = "0.1.0"
+version = "0.1.1"
 authors = [
     "Kris Nuttycombe <kris@nutty.land>",
 ]
