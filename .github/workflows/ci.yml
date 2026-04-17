@@ -31,6 +31,19 @@ jobs:
       - uses: actions/checkout@v4
       - run: cargo test --no-default-features
 
+  test-32bit:
+    name: Test (i686, 32-bit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y gcc-multilib
+      # i686-unknown-linux-gnu is a 32-bit x86 Linux target, used here to
+      # exercise code paths that depend on usize being smaller than u64.
+      - run: rustup target add i686-unknown-linux-gnu
+      - run: cargo test --target i686-unknown-linux-gnu --all-features
+      - run: cargo test --target i686-unknown-linux-gnu --no-default-features --features alloc
+      - run: cargo test --target i686-unknown-linux-gnu --no-default-features
+
   build-nostd-target:
     name: Build (thumbv7em-none-eabihf)
     runs-on: ubuntu-latest
