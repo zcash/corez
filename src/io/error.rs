@@ -46,28 +46,6 @@ impl fmt::Display for ErrorKind {
 }
 
 // ---------------------------------------------------------------------------
-// Internal representation
-// ---------------------------------------------------------------------------
-
-#[cfg(not(feature = "alloc"))]
-enum Repr {
-    Simple(ErrorKind),
-    Custom {
-        kind: ErrorKind,
-        message: &'static str,
-    },
-}
-
-#[cfg(feature = "alloc")]
-enum Repr {
-    Simple(ErrorKind),
-    Custom {
-        kind: ErrorKind,
-        error: alloc::boxed::Box<dyn core::error::Error + Send + Sync>,
-    },
-}
-
-// ---------------------------------------------------------------------------
 // Error
 // ---------------------------------------------------------------------------
 
@@ -77,7 +55,11 @@ enum Repr {
 /// optional context. When the `alloc` feature is enabled the context may be
 /// any type implementing [`core::error::Error`] + [`Send`] + [`Sync`].
 pub struct Error {
-    repr: Repr,
+    kind: ErrorKind,
+    #[cfg(not(feature = "alloc"))]
+    message: Option<&'static str>,
+    #[cfg(feature = "alloc")]
+    error: Option<alloc::boxed::Box<dyn core::error::Error + Send + Sync>>,
 }
 
 impl Error {
@@ -86,13 +68,11 @@ impl Error {
     /// This constructor is available with or without `alloc`.
     pub fn new_static(kind: ErrorKind, message: &'static str) -> Self {
         Error {
-            repr: Repr::Custom {
-                kind,
-                #[cfg(not(feature = "alloc"))]
-                message,
-                #[cfg(feature = "alloc")]
-                error: message.into(),
-            },
+            kind,
+            #[cfg(not(feature = "alloc"))]
+            message: Some(message),
+            #[cfg(feature = "alloc")]
+            error: Some(message.into()),
         }
     }
 
@@ -106,70 +86,68 @@ impl Error {
         E: Into<alloc::boxed::Box<dyn core::error::Error + Send + Sync>>,
     {
         Error {
-            repr: Repr::Custom {
-                kind,
-                error: error.into(),
-            },
+            kind,
+            error: Some(error.into()),
         }
     }
 
     /// Returns the corresponding [`ErrorKind`] for this error.
     pub fn kind(&self) -> ErrorKind {
-        match &self.repr {
-            Repr::Simple(kind) => *kind,
-            Repr::Custom { kind, .. } => *kind,
-        }
+        self.kind
     }
 }
 
 impl From<ErrorKind> for Error {
     fn from(kind: ErrorKind) -> Self {
         Error {
-            repr: Repr::Simple(kind),
+            kind,
+            #[cfg(not(feature = "alloc"))]
+            message: None,
+            #[cfg(feature = "alloc")]
+            error: None,
         }
     }
 }
 
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.repr {
-            Repr::Simple(kind) => f.debug_tuple("Error").field(kind).finish(),
-            #[cfg(not(feature = "alloc"))]
-            Repr::Custom { kind, message } => f
-                .debug_struct("Error")
-                .field("kind", kind)
-                .field("message", message)
-                .finish(),
-            #[cfg(feature = "alloc")]
-            Repr::Custom { kind, error } => f
-                .debug_struct("Error")
-                .field("kind", kind)
-                .field("error", error)
-                .finish(),
+        let mut s = f.debug_struct("Error");
+        s.field("kind", &self.kind);
+        #[cfg(not(feature = "alloc"))]
+        if let Some(message) = self.message {
+            s.field("message", &message);
         }
+        #[cfg(feature = "alloc")]
+        if let Some(error) = &self.error {
+            s.field("error", error);
+        }
+        s.finish()
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.repr {
-            Repr::Simple(kind) => kind.fmt(f),
-            #[cfg(not(feature = "alloc"))]
-            Repr::Custom { message, .. } => f.write_str(message),
-            #[cfg(feature = "alloc")]
-            Repr::Custom { error, .. } => error.fmt(f),
+        #[cfg(not(feature = "alloc"))]
+        if let Some(message) = self.message {
+            return f.write_str(message);
         }
+        #[cfg(feature = "alloc")]
+        if let Some(error) = &self.error {
+            return error.fmt(f);
+        }
+        self.kind.fmt(f)
     }
 }
 
 impl core::error::Error for Error {
     fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
-        match &self.repr {
-            Repr::Simple(_) => None,
-            #[cfg(not(feature = "alloc"))]
-            Repr::Custom { .. } => None,
-            #[cfg(feature = "alloc")]
-            Repr::Custom { error, .. } => error.source(),
+        #[cfg(not(feature = "alloc"))]
+        {
+            None
+        }
+        #[cfg(feature = "alloc")]
+        {
+            self.error.as_ref().and_then(|e| e.source())
         }
     }
 }

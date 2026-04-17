@@ -47,11 +47,13 @@ If this returns `true`, the contribution gate can be skipped.
 
 If AI tools were used in the preparation of a commit, the contributor MUST
 include `Co-Authored-By:` metadata in the commit message identifying the AI
-system. Failure to include this is grounds for closing the pull request.
+system and version. Failure to include this is grounds for closing the pull
+request. The human contributor is the sole responsible author — "the AI
+generated it" is not a justification during review.
 
 Example:
 ```
-Co-Authored-By: Claude <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 ```
 
 ## Build & Test Commands
@@ -77,8 +79,10 @@ cargo fmt --all -- --check
 
 ### Crate-Level Attributes
 
-The crate enforces `#![deny(unsafe_code)]`. All public items must have complete
-`rustdoc` documentation.
+The crate enforces `#![forbid(unsafe_code)]`. All public items must have complete
+`rustdoc` documentation. For impls of traits that themselves have thoroughly
+documented methods, that may be sufficient if there is nothing relevant to
+add about the specific impl.
 
 ### Type Safety
 
@@ -89,7 +93,9 @@ The crate enforces `#![deny(unsafe_code)]`. All public items must have complete
 ### Error Handling
 
 - Use `Result<T, E>` with descriptive error types.
-- No panics except in provably unreachable cases.
+- Avoid panics where possible. Allocation failure (OOM) panics from
+  standard collections are acceptable; explicit panics should only occur
+  in provably unreachable cases.
 
 ### Functional Style
 

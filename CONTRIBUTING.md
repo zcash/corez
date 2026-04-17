@@ -24,7 +24,8 @@ terms or conditions.
 ## AI Contributions
 
 See [AGENTS.md](AGENTS.md) for the AI contribution policy, including required
-`Co-Authored-By` metadata.
+`Co-Authored-By` metadata and prior discussion on an issue of the proposed
+change.
 
 ## Git Workflow
 
@@ -49,12 +50,13 @@ semantic variants.
 ### Error Handling
 
 Use `Result<T, E>` with descriptive error types. Do not panic or abort except in
-provably unreachable cases.
+provably unreachable cases. Allocation failure (OOM) panics from standard
+collections are acceptable.
 
 ### Unsafe Code
 
 This crate has a strict **no `unsafe` code** policy. The crate-level attribute
-`#![deny(unsafe_code)]` is enforced.
+`#![forbid(unsafe_code)]` is enforced.
 
 ### Documentation
 

@@ -21,6 +21,7 @@ pub trait Read {
     ///   produced. If your source can temporarily have no data (e.g. a
     ///   non-blocking channel), return
     ///   `Err(ErrorKind::Interrupted)` or a custom error instead.
+    ///   If the source has an end, it should eventually return `Ok(0)`.
     /// * **`Ok(0)` with an empty `buf` is always valid** and should not block.
     /// * **Short reads are not errors.** `Ok(n)` with `0 < n < buf.len()` is
     ///   expected; callers loop when they need more.

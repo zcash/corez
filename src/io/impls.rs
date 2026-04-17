@@ -76,12 +76,7 @@ impl Read for &[u8] {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let amt = core::cmp::min(buf.len(), self.len());
         let (to_copy, rest) = self.split_at(amt);
-        // Optimize single-byte case to avoid slice copy overhead.
-        if amt == 1 {
-            buf[0] = to_copy[0];
-        } else {
-            buf[..amt].copy_from_slice(to_copy);
-        }
+        buf[..amt].copy_from_slice(to_copy);
         *self = rest;
         Ok(amt)
     }

@@ -92,6 +92,18 @@ fn cursor_write_vec_extends() {
     assert_eq!(cursor.into_inner(), vec![1, 10, 20, 30]);
 }
 
+// On platforms where usize < u64, a cursor position beyond usize::MAX
+// must produce an InvalidInput error rather than silently truncating.
+#[test]
+#[cfg(feature = "alloc")]
+#[cfg(not(target_pointer_width = "64"))]
+fn cursor_write_vec_pos_overflow() {
+    let mut cursor = Cursor::new(Vec::new());
+    cursor.set_position(u64::from(u32::MAX) + 1);
+    let err = cursor.write_all(&[1]).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::InvalidInput);
+}
+
 // ---------------------------------------------------------------------------
 // Cursor — Write (&mut [u8])
 // ---------------------------------------------------------------------------

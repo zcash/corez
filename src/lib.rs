@@ -12,7 +12,7 @@
 //! ```
 
 #![no_std]
-#![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
 

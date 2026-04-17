@@ -107,7 +107,12 @@ impl Write for Cursor<&mut [u8]> {
 
 #[cfg(feature = "alloc")]
 fn vec_write(pos: &mut u64, vec: &mut alloc::vec::Vec<u8>, buf: &[u8]) -> Result<usize> {
-    let start = *pos as usize;
+    let start: usize = (*pos).try_into().map_err(|_| {
+        Error::new_static(
+            ErrorKind::InvalidInput,
+            "cursor position exceeds maximum possible vector length",
+        )
+    })?;
     // Fill any gap between the current length and the write position with
     // zeros.  Only the gap is resized here — the write payload is handled
     // below via copy_from_slice (overwrite) and extend_from_slice (append)
