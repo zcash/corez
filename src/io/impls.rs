@@ -39,6 +39,7 @@ impl<W: Write + ?Sized> Write for &mut W {
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 impl<R: Read + ?Sized> Read for alloc::boxed::Box<R> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         (**self).read(buf)
@@ -50,6 +51,7 @@ impl<R: Read + ?Sized> Read for alloc::boxed::Box<R> {
 }
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 impl<W: Write + ?Sized> Write for alloc::boxed::Box<W> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         (**self).write(buf)
@@ -125,6 +127,7 @@ impl Write for &mut [u8] {
 // ---------------------------------------------------------------------------
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 impl Write for alloc::vec::Vec<u8> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         self.extend_from_slice(buf);

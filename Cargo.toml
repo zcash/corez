@@ -25,3 +25,8 @@ alloc = []
 
 [lib]
 bench = false
+
+[package.metadata.docs.rs]
+no-default-features = true
+features = ["alloc"]
+rustdoc-args = ["--cfg", "docsrs"]

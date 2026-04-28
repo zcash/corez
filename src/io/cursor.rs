@@ -131,6 +131,7 @@ fn vec_write(pos: &mut u64, vec: &mut alloc::vec::Vec<u8>, buf: &[u8]) -> Result
 }
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 impl Write for Cursor<alloc::vec::Vec<u8>> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         vec_write(&mut self.pos, &mut self.inner, buf)
@@ -142,6 +143,7 @@ impl Write for Cursor<alloc::vec::Vec<u8>> {
 }
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 impl Write for Cursor<&mut alloc::vec::Vec<u8>> {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         vec_write(&mut self.pos, self.inner, buf)
