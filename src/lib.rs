@@ -15,11 +15,18 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![deny(rustdoc::broken_intra_doc_links)]
+// `doc(auto_cfg)` covers method-level `#[cfg(...)]` annotations. Cfgs on
+// impl blocks (and other "container" items) currently need an explicit
+// `#[cfg_attr(docsrs, doc(cfg(...)))]` as a workaround for
+// https://github.com/rust-lang/rust/issues/150268 ; remove those when
+// that is fixed.
+#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, doc(auto_cfg))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-#[cfg(feature = "std")]
+#[cfg(any(feature = "std", doc))]
 extern crate std;
 
 /// I/O traits, types, and error handling.
@@ -30,4 +37,5 @@ extern crate std;
 pub use std::io;
 
 #[cfg(not(feature = "std"))]
+#[cfg_attr(docsrs, doc(cfg(all())))]
 pub mod io;

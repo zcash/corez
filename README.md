@@ -2,6 +2,8 @@
 
 Safe, `no_std`-compatible `Read` and `Write` traits for the Zcash ecosystem.
 
+[Documentation on docs.rs](https://docs.rs/corez).
+
 This crate provides a minimal subset of `std::io` that works in `no_std`
 environments without any `unsafe` code. When the `std` feature is enabled
 (the default), all types are re-exported directly from `std::io`.

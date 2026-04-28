@@ -7,6 +7,11 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+### Fixed
+- docs.rs now builds documentation with `--no-default-features --features alloc`,
+  so the published docs describe the `corez::io` module's own API rather than
+  the `std::io` re-export. (#5)
+
 ## [0.1.1] - 2026-04-17
 
 ### Changed
