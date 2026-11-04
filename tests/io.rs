@@ -10,6 +10,10 @@ use corez::io::{Cursor, ErrorKind, Read, Write};
 /// input ends before the buffer is full.
 const READ_EXACT_EOF_MESSAGE: &str = "failed to fill whole buffer";
 
+/// The message of the error that `std::io::Write::write_all` returns when the
+/// writer accepts no more bytes.
+const WRITE_ALL_EOF_MESSAGE: &str = "failed to write whole buffer";
+
 // ---------------------------------------------------------------------------
 // Cursor — Read
 // ---------------------------------------------------------------------------
@@ -161,6 +165,10 @@ fn cursor_write_mut_slice_overflow() {
     let mut cursor = Cursor::new(&mut buf[..]);
     let err = cursor.write_all(&[1, 2, 3]).unwrap_err();
     assert_eq!(err.kind(), ErrorKind::WriteZero);
+    assert_eq!(err.to_string(), WRITE_ALL_EOF_MESSAGE);
+    // The bytes that fit are written before the failure.
+    assert_eq!(cursor.position(), 2);
+    assert_eq!(buf, [1, 2]);
 }
 
 #[test]
@@ -240,6 +248,18 @@ fn write_mut_slice_basic() {
     assert_eq!(writer.write(&[1, 2, 3]).unwrap(), 3);
     assert_eq!(writer.write(&[4, 5, 6]).unwrap(), 2);
     assert_eq!(buf, [1, 2, 3, 4, 5]);
+}
+
+#[test]
+fn write_all_mut_slice_overflow() {
+    let mut buf = [0u8; 2];
+    let mut writer: &mut [u8] = &mut buf;
+    let err = writer.write_all(&[1, 2, 3]).unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::WriteZero);
+    assert_eq!(err.to_string(), WRITE_ALL_EOF_MESSAGE);
+    // The bytes that fit are written, and the slice is fully consumed.
+    assert!(writer.is_empty());
+    assert_eq!(buf, [1, 2]);
 }
 
 // ---------------------------------------------------------------------------
@@ -440,6 +460,7 @@ fn write_all_default_write_zero() {
     };
     let err = writer.write_all(&[1, 2, 3]).unwrap_err();
     assert_eq!(err.kind(), ErrorKind::WriteZero);
+    assert_eq!(err.to_string(), WRITE_ALL_EOF_MESSAGE);
 }
 
 // ---------------------------------------------------------------------------

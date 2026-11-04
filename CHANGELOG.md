@@ -14,6 +14,11 @@ and this library adheres to Rust's notion of
   - `<&[u8] as Read>::read_exact` consumes the remaining input;
   - `<Cursor<_> as Read>::read_exact` sets the position to the length of the
     buffer.
+- Without the `std` feature, `Write::write_all` now fails in the same way as
+  `std::io::Write::write_all` when the writer accepts no more bytes:
+  - the error message is "failed to write whole buffer";
+  - `<&mut [u8] as Write>::write_all` writes the part of the buffer that fits
+    and consumes the slice.
 
 ### Fixed
 - docs.rs now builds documentation with `--no-default-features --features alloc`,

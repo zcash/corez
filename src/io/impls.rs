@@ -1,6 +1,6 @@
 //! `Read` and `Write` implementations for core types in `no_std` environments.
 
-use super::{Error, ErrorKind, Read, Result, Write};
+use super::{Error, Read, Result, Write};
 
 // ---------------------------------------------------------------------------
 // Forwarding impls — &mut R / &mut W
@@ -110,13 +110,12 @@ impl Write for &mut [u8] {
     }
 
     fn write_all(&mut self, buf: &[u8]) -> Result<()> {
-        if buf.len() > self.len() {
-            return Err(Error::from(ErrorKind::WriteZero));
+        // Write the part of `buf` that fits before failing, as `std` does.
+        if self.write(buf)? == buf.len() {
+            Ok(())
+        } else {
+            Err(Error::write_all_eof())
         }
-        let (dest, rest) = core::mem::take(self).split_at_mut(buf.len());
-        dest.copy_from_slice(buf);
-        *self = rest;
-        Ok(())
     }
 
     fn flush(&mut self) -> Result<()> {
