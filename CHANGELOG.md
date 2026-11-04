@@ -7,6 +7,14 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+### Changed
+- Without the `std` feature, `Read::read_exact` now fails in the same way as
+  `std::io::Read::read_exact` when the input ends before the buffer is full:
+  - the error message is "failed to fill whole buffer";
+  - `<&[u8] as Read>::read_exact` consumes the remaining input;
+  - `<Cursor<_> as Read>::read_exact` sets the position to the length of the
+    buffer.
+
 ### Fixed
 - docs.rs now builds documentation with `--no-default-features --features alloc`,
   so the published docs describe the `corez::io` module's own API rather than

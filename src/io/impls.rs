@@ -85,7 +85,9 @@ impl Read for &[u8] {
 
     fn read_exact(&mut self, buf: &mut [u8]) -> Result<()> {
         if buf.len() > self.len() {
-            return Err(Error::from(ErrorKind::UnexpectedEof));
+            // Consume the remaining input, as `std` does.
+            *self = &self[self.len()..];
+            return Err(Error::read_exact_eof());
         }
         let (to_copy, rest) = self.split_at(buf.len());
         buf.copy_from_slice(to_copy);
