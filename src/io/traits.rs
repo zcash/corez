@@ -38,7 +38,7 @@ pub trait Read {
     fn read_exact(&mut self, mut buf: &mut [u8]) -> Result<()> {
         while !buf.is_empty() {
             match self.read(buf) {
-                Ok(0) => return Err(Error::from(ErrorKind::UnexpectedEof)),
+                Ok(0) => return Err(Error::read_exact_eof()),
                 Ok(n) => buf = &mut buf[n..],
                 Err(ref e) if e.kind() == ErrorKind::Interrupted => {
                     // Errors of kind [`ErrorKind::Interrupted`] are automatically retried.
@@ -90,7 +90,7 @@ pub trait Write {
     fn write_all(&mut self, mut buf: &[u8]) -> Result<()> {
         while !buf.is_empty() {
             match self.write(buf) {
-                Ok(0) => return Err(Error::from(ErrorKind::WriteZero)),
+                Ok(0) => return Err(Error::write_all_eof()),
                 Ok(n) => buf = &buf[n..],
                 Err(ref e) if e.kind() == ErrorKind::Interrupted => {
                     // Errors of kind [`ErrorKind::Interrupted`] are automatically retried.

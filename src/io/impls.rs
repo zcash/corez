@@ -1,6 +1,6 @@
 //! `Read` and `Write` implementations for core types in `no_std` environments.
 
-use super::{Error, ErrorKind, Read, Result, Write};
+use super::{Error, Read, Result, Write};
 
 // ---------------------------------------------------------------------------
 // Forwarding impls — &mut R / &mut W
@@ -85,7 +85,9 @@ impl Read for &[u8] {
 
     fn read_exact(&mut self, buf: &mut [u8]) -> Result<()> {
         if buf.len() > self.len() {
-            return Err(Error::from(ErrorKind::UnexpectedEof));
+            // Consume the remaining input, as `std` does.
+            *self = &self[self.len()..];
+            return Err(Error::read_exact_eof());
         }
         let (to_copy, rest) = self.split_at(buf.len());
         buf.copy_from_slice(to_copy);
@@ -108,13 +110,12 @@ impl Write for &mut [u8] {
     }
 
     fn write_all(&mut self, buf: &[u8]) -> Result<()> {
-        if buf.len() > self.len() {
-            return Err(Error::from(ErrorKind::WriteZero));
+        // Write the part of `buf` that fits before failing, as `std` does.
+        if self.write(buf)? == buf.len() {
+            Ok(())
+        } else {
+            Err(Error::write_all_eof())
         }
-        let (dest, rest) = core::mem::take(self).split_at_mut(buf.len());
-        dest.copy_from_slice(buf);
-        *self = rest;
-        Ok(())
     }
 
     fn flush(&mut self) -> Result<()> {

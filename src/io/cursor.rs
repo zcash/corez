@@ -4,7 +4,10 @@
 
 use core::cmp;
 
-use super::{Error, ErrorKind, Read, Result, Write};
+use super::{Error, Read, Result, Write};
+
+#[cfg(feature = "alloc")]
+use super::ErrorKind;
 
 /// A `Cursor` wraps an in-memory buffer and provides it with a [`Read`]
 /// and/or [`Write`] implementation.
@@ -71,7 +74,9 @@ impl<T: AsRef<[u8]>> Read for Cursor<T> {
         let start = cmp::min(self.pos, slice.len() as u64) as usize;
         let remaining = &slice[start..];
         if buf.len() > remaining.len() {
-            return Err(Error::from(ErrorKind::UnexpectedEof));
+            // Move the position to the end of the buffer, as `std` does.
+            self.pos = slice.len() as u64;
+            return Err(Error::read_exact_eof());
         }
         buf.copy_from_slice(&remaining[..buf.len()]);
         self.pos += buf.len() as u64;

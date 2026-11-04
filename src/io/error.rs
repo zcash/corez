@@ -95,6 +95,20 @@ impl Error {
     pub fn kind(&self) -> ErrorKind {
         self.kind
     }
+
+    /// Returns the error that `read_exact` returns when the input ends before
+    /// `buf` is full. The kind and message are the same as for
+    /// [`std::io::Read::read_exact`].
+    pub(crate) fn read_exact_eof() -> Self {
+        Error::new_static(ErrorKind::UnexpectedEof, "failed to fill whole buffer")
+    }
+
+    /// Returns the error that `write_all` returns when the writer accepts no
+    /// more bytes before all of `buf` is written. The kind and message are the
+    /// same as for [`std::io::Write::write_all`].
+    pub(crate) fn write_all_eof() -> Self {
+        Error::new_static(ErrorKind::WriteZero, "failed to write whole buffer")
+    }
 }
 
 impl From<ErrorKind> for Error {
